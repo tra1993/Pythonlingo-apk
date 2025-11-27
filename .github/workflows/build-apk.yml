@@ -1,50 +1,63 @@
-steps:
-  # Code များကို Cloud Server သို့ clone လုပ်ခြင်း
-  - name: ⬇️ Checkout Code
-    uses: actions/checkout@v4
+name: 🤖 Build Pythonlingo APK (Hybrid)
 
-  # Node.js နှင့် NPM ကို ထည့်သွင်းခြင်း (Hybrid App Build အတွက် မရှိမဖြစ်)
-  - name: ⚙️ Setup Node.js Environment
-    uses: actions/setup-node@v4
-    with:
-      node-version: '18'
-      
-  # Apache Cordova (Hybrid App Tool) ကို install လုပ်ခြင်း
-  - name: 📦 Install Cordova CLI
-    run: npm install -g cordova
+# main branch ကို push လုပ်လိုက်တိုင်း သို့မဟုတ် manually run လိုက်တိုင်း အလုပ်လုပ်ရန်
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
-  # =======================================================
-  # 🚧 APK Build Steps (Placeholder - နောက်အဆင့်တွင် ဖြည့်ရန်)
-  # ဤနေရာတွင် index.html ကို APK အဖြစ် ထုပ်ပိုးရန်အတွက်
-  # Cordova Project ကို Setup လုပ်ပြီး Build လုပ်မည်။
-  # (သင့် device RAM/ROM ကို လုံးဝ မသုံးရပါ။ Cloud မှာ လုပ်ဆောင်မည်။)
-  # =======================================================
-  - name: 🚧 Simulate APK Build Process
-    run: |
-      echo "Building the Pythonlingo APK on the GitHub Cloud Runner..."
-      # 실제 cordova project setup 및 build 명령어가 여기에 들어갈 예정입니다.
-      # 예시:
-      # cordova create app com.tra1993.pythonlingo PythonLingo
-      # cd app
-      # cordova platform add android
-      # cp ../index.html www/index.html
-      # cordova build android --release 
-      
-      # ယခု လောလောဆယ်တွင် build output folder တစ်ခု ဖန်တီးထားလိုက်ပါမည်
-      mkdir -p android/app/build/outputs/apk/release
-      echo "Build finished successfully (Simulation)"
-      
-  # =======================================================
-  
-  # Build ပြီးစီးသော APK file ကို Artifact အဖြစ် သိမ်းဆည်းခြင်း
-  # ဒါမှ သင် GitHub Website ကနေ အလွယ်တကူ download လုပ်နိုင်မည်။
-  - name: ⬆️ Upload APK Artifact
-    uses: actions/upload-artifact@v4
-    with:
-      name: pythonlingo-apk-build
-      path: android/app/build/outputs/apk/release/*.apk 
-      retention-days: 7
-      if-no-files-found: warn # File မတွေ့ရင် သတိပေးရန်
+jobs: # <- ဤနေရာသည် YAML structure အရ မှန်ကန်သော အစဖြစ်ပါသည်။
+  build_hybrid_apk:
+    # GitHub ရဲ့ Cloud Server (Linux) ကို အသုံးပြုရန် သတ်မှတ်ခြင်း
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Code များကို Cloud Server သို့ clone လုပ်ခြင်း
+      - name: ⬇️ Checkout Code
+        uses: actions/checkout@v4
 
-  - name: ✅ Workflow Summary
-    run: echo "APK Build Workflow Has Completed!"
+      # Node.js နှင့် NPM ကို ထည့်သွင်းခြင်း (Hybrid App Build အတွက် မရှိမဖြစ်)
+      - name: ⚙️ Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      # Apache Cordova (Hybrid App Tool) ကို install လုပ်ခြင်း
+      - name: 📦 Install Cordova CLI
+        run: npm install -g cordova
+
+      # =======================================================
+      # 🚧 Cordova Project Configuration နှင့် Build
+      # =======================================================
+      - name: 🏗️ Setup Cordova Project Structure
+        # Cordova project ၏ www folder ထဲသို့ index.html ကို ကူးထည့်ရန် လိုအပ်သည်
+        run: |
+          # Cordova Project အသစ် ဖန်တီးခြင်း
+          cordova create app com.tra1993.pythonlingo PythonLingo
+          
+          # HTML/JS Code များ ထည့်သွင်းခြင်း
+          cp index.html app/www/index.html
+          
+      - name: 🛠️ Add Android Platform and Build APK
+        # Project Folder ထဲသို့ ဝင်ရောက်ပြီး Android Build လုပ်ရန်
+        run: |
+          cd app
+          # Android Platform ကို ထည့်သွင်းရန်
+          cordova platform add android
+          # Debug build ကို ဖန်တီးပါ (Cloud Server တွင် လုပ်ဆောင်မည်)
+          cordova build android --debug 
+          
+      # =======================================================
+      
+      # Build ပြီးစီးသော APK file ကို Artifact အဖြစ် သိမ်းဆည်းခြင်း
+      # debug APK သည် platforms/android/app/build/outputs/apk/debug/ တွင် ရှိသည်
+      - name: ⬆️ Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pythonlingo-debug-apk
+          path: app/platforms/android/app/build/outputs/apk/debug/*.apk 
+          retention-days: 7
+
+      - name: ✅ Workflow Summary
+        run: echo "APK Build Workflow Has Completed!"
