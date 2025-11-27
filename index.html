@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python လေ့လာရေး ဂိမ်း</title>
+    <!-- Tailwind CSS (Mobile-first design အတွက် အသုံးပြု) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Duolingo ကို အတုယူထားသော အရောင်များ */
+        :root {
+            --color-primary: #1cb0f6; /* Blue for action */
+            --color-correct: #58cc02; /* Green for correct */
+            --color-incorrect: #ff4848; /* Red for incorrect */
+            --color-grey: #e5e5e5;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7; /* Light background */
+        }
+        .container {
+            max-width: 640px; /* Mobile View limit */
+        }
+        .option-button {
+            transition: all 0.2s;
+            border: 2px solid var(--color-grey);
+            background-color: white;
+        }
+        .option-button:hover:not(.selected) {
+            border-color: #a8a8a8;
+        }
+        .option-button.selected {
+            border-color: var(--color-primary);
+            background-color: #e0f6ff;
+            box-shadow: 0 4px 0 var(--color-primary);
+        }
+        .feedback-bar {
+            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .progress-bar-inner {
+            transition: width 0.3s ease-in-out;
+            background-color: var(--color-primary);
+        }
+        .correct-feedback {
+            background-color: var(--color-correct);
+        }
+        .incorrect-feedback {
+            background-color: var(--color-incorrect);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="container mx-auto min-h-screen flex flex-col">
+        <!-- Header and Progress Bar -->
+        <header class="p-4 bg-white shadow-md">
+            <div class="flex items-center space-x-2">
+                <button onclick="restartLesson()" class="text-gray-500 hover:text-red-500 transition">
+                    <!-- Close Icon (X) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <div class="flex-grow bg-gray-200 rounded-full h-2">
+                    <div id="progress-bar" class="progress-bar-inner h-2 rounded-full" style="width: 0%;"></div>
+                </div>
+            </header>
+
+            <!-- Main Lesson Content Area -->
+            <main class="flex-grow p-4 md:p-8 flex flex-col justify-center">
+                <!-- Question Text -->
+                <h1 id="question-text" class="text-2xl md:text-3xl font-bold mb-6 text-gray-800 leading-snug">
+                    <!-- Question will be loaded here -->
+                </h1>
+
+                <!-- Options Area (Keywords/Burmese words) -->
+                <div id="options-container" class="grid grid-cols-2 gap-4">
+                    <!-- Buttons/Choices will be injected here by JavaScript -->
+                </div>
+            </main>
+
+            <!-- Feedback and Action Bar -->
+            <footer id="feedback-footer" class="feedback-bar fixed bottom-0 w-full md:max-w-xl mx-auto bg-white p-4 transition-all duration-300 transform translate-y-full">
+                <div id="feedback-message" class="hidden text-white p-3 mb-3 rounded-xl font-bold text-lg">
+                    <!-- Correct/Incorrect message here -->
+                </div>
+                <button id="check-button" onclick="checkAnswer()" disabled class="w-full bg-gray-300 text-gray-600 font-bold py-3 rounded-xl transition duration-200 cursor-not-allowed">
+                    စစ်ဆေးရန်
+                </button>
+                <button id="continue-button" onclick="nextQuestion()" class="w-full bg-green-600 text-white font-bold py-3 rounded-xl transition duration-200 hover:bg-green-700 hidden">
+                    ဆက်သွားရန်
+                </button>
+            </footer>
+
+            <!-- Modal for End of Lesson -->
+            <div id="end-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+                <div class="bg-white rounded-xl p-8 max-w-sm w-full text-center">
+                    <div class="text-yellow-500 mb-4">
+                        <!-- Trophy Icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-8a1 1 0 00-2 0v2a1 1 0 102 0v-2zm4-2a1 1 0 00-2 0v4a1 1 0 102 0V9z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <h2 class="text-3xl font-extrabold text-gray-800 mb-3">သင်ခန်းစာ ပြီးဆုံးပါပြီ!</h2>
+                    <p class="text-gray-600 mb-6">သင့်ရဲ့ စုစုပေါင်း မှန်ကန်မှု ရလဒ်: <span id="final-score" class="font-bold text-xl text-green-600"></span></p>
+                    <button onclick="restartLesson()" class="w-full bg-primary text-white font-bold py-3 rounded-xl transition duration-200 hover:opacity-80" style="background-color: var(--color-primary);">
+                        နောက်တစ်ကြိမ် ပြန်စရန်
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Python Keywords နှင့် Operators များ၏ အဓိပ္ပာယ်များ (သင်ပေးထားသော Data ကို အသုံးပြု)
+            const LESSON_DATA = [
+                {
+                    category: "Boolean & Constants (မှား/မှန် တန်ဖိုး)",
+                    items: [
+                        { keyword: "False", burmese: "မမှန်ကန်သော တန်ဖိုး", purpose: "Boolean တန်ဖိုး မမှန်ကန်ကြောင်း ဖော်ပြရန်", example: "is_raining = False" },
+                        { keyword: "None", burmese: "တန်ဖိုး မရှိခြင်း", purpose: "variable တစ်ခုကို 'ဘာမှ မသတ်မှတ်သေး' ဟု ဖော်ပြရန်", example: "result = None" },
+                        { keyword: "True", burmese: "မှန်ကန်သော တန်ဖိုး", purpose: "Boolean တန်ဖိုး မှန်ကန်ကြောင်း ဖော်ပြရန်", example: "is_login = True" },
+                    ]
+                },
+                {
+                    category: "Control Flow & Loops (အလုပ်စီးဆင်းမှု ထိန်းချုပ်ခြင်း)",
+                    items: [
+                        { keyword: "if", burmese: "အကယ်၍", purpose: "အခြေအနေ စစ်ဆေးပြီး လုပ်ရန်", example: "if age >= 18:" },
+                        { keyword: "elif", burmese: "သို့မဟုတ်ပါက အကယ်၍", purpose: "if...else အလယ်တွင် အခြားအခြေအနေ ထပ်စစ်ရန်", example: "elif age < 13:" },
+                        { keyword: "else", burmese: "သို့မဟုတ်ပါက", purpose: "if/elif မမှန်ရင် ဤ block ကို လုပ်ရန်", example: "else: print('အရွယ်ရောက်ပြီ')" },
+                        { keyword: "for", burmese: "အတွက် (Loop)", purpose: "အရေအတွက်သတ်မှတ်ထားသော loop လုပ်ရန်", example: "for i in range(5):" },
+                        { keyword: "while", burmese: "တစ်လျှောက်လုံး (Loop)", purpose: "အခြေအနေ မှန်နေသမျှ loop လုပ်ရန်", example: "while count < 10:" },
+                        { keyword: "break", burmese: "ရပ်တန့်ပါ", purpose: "loop (for/while) ကို ချက်ချင်းထွက်ရန်", example: "if x == 10: break" },
+                        { keyword: "continue", burmese: "နောက်တစ်ခါ ဆက်လုပ်ပါ", purpose: "loop တွင် လက်ရှိ iteration ကို ကျော်ပြီး နောက်တစ်ခါသို့ ချက်ချင်းသွားရန်", example: "if x % 2 == 0: continue" },
+                        { keyword: "pass", burmese: "ဘာမှ မလုပ်ပါနှင့်", purpose: "ယာယီ empty block လိုအပ်ချိန်တွင် အသုံးပြုရန်", example: "if x > 0: pass" },
+                    ]
+                },
+                {
+                    category: "Functions, Classes, and Modules",
+                    items: [
+                        { keyword: "def", burmese: "Function ဖန်တီးပါ", purpose: "function တစ်ခု ဖန်တီးရန်", example: "def hello():" },
+                        { keyword: "return", burmese: "တန်ဖိုး ပြန်ပို့ပါ", purpose: "function မှ တန်ဖိုးကို ပြန်ပို့ရန်", example: "return x * x" },
+                        { keyword: "class", burmese: "အတန်း (Class)", purpose: "Object-Oriented Programming တွင် class တစ်ခု ဖန်တီးရန်", example: "class Person:" },
+                        { keyword: "import", burmese: "သွင်းယူပါ (Module)", purpose: "အခြား module သို့မဟုတ် library ကို သွင်းယူရန်", example: "import os" },
+                        { keyword: "as", burmese: "အမည်ပြောင်းရန်", purpose: "import လုပ်ချိန်တွင် module နာမည်ကို အတိုကောက်ရန်", example: "import numpy as np" },
+                        { keyword: "lambda", burmese: "အမည်မဲ့ function", purpose: "ရိုးရှင်းသော function တစ်ခုကို တစ်လိုင်းတည်းနှင့် ဖန်တီးရန်", example: "square = lambda x: x*x" },
+                        { keyword: "with", burmese: "နှင့်အတူ", purpose: "resource ကို အလိုအလျောက် ရှင်းလင်းပေးရန် (file, db connection)", example: "with open('f.txt') as f:" },
+                    ]
+                },
+                {
+                    category: "Operators (သင်္ကေတများ) နှင့် Boolean Logic",
+                    items: [
+                        { keyword: "==", burmese: "တူညီမှု နှိုင်းယှဉ်ခြင်း", purpose: "တန်ဖိုးများ တူ/မတူ နှိုင်းယှဉ်ရန်", example: "if x == 5:" },
+                        { keyword: "!=", burmese: "မတူညီမှု နှိုင်းယှဉ်ခြင်း", purpose: "တန်ဖိုးများ မတူ/တူ နှိုင်းယှဉ်ရန်", example: "if name != 'admin':" },
+                        { keyword: "+=", burmese: "ပေါင်း၍ ပြန်သတ်မှတ်ခြင်း", purpose: "လက်ရှိတန်ဖိုးကို ပေါင်းထည့်ပြီး ပြန်သတ်မှတ်ရန်", example: "count += 1" },
+                        { keyword: "and", burmese: "ယုတ္တိ 'နှင့်'", purpose: "အခြေအနေ နှစ်ခုလုံး မှန်မှ ဆက်လုပ်ရန်", example: "if a > 1 and b < 10:" },
+                        { keyword: "or", burmese: "ယုတ္တိ 'သို့မဟုတ်'", purpose: "အခြေအနေ တစ်ခုခု မှန်ရင်ရရန်", example: "if is_admin or is_mod:" },
+                        { keyword: "not", burmese: "ယုတ္တိ 'မဟုတ်ပါ'", purpose: "Boolean တန်ဖိုး ပြောင်းပြန်လှန်ရန်", example: "if not is_valid:" },
+                        { keyword: ":", burmese: "Block စတင်ခြင်း", purpose: "Code Block စတင်ကြောင်း ဖော်ပြရန်", example: "if condition: [code block]" },
+                        { keyword: "in", burmese: "အတွင်း၌ ပါဝင်မှု", purpose: "တစ်ခုခု ပါ/မပါ စစ်ရန်", example: "if 'apple' in fruits:" },
+                        { keyword: "is", burmese: "Object တူညီမှု", purpose: "Object identity တူ/မတူ စစ်ဆေးရန် (== နှင့် မတူ)", example: "if x is None:" },
+                    ]
+                }
+            ];
+
+            // Global State များကို သတ်မှတ်ခြင်း
+            let currentLesson = []; // လက်ရှိ သင်ခန်းစာ၏ အချက်အလက်များ
+            let currentQuestionIndex = 0;
+            let selectedOption = null;
+            let totalCorrect = 0;
+            let isAnswerChecked = false;
+
+            // Utility function: Array ကို ရောမွှေရန်
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            // Lesson ကို စတင်ပြင်ဆင်ရန်
+            function initializeLesson() {
+                // Data အားလုံးကို ယူ၍ ရောမွှေပါ
+                currentLesson = [];
+                LESSON_DATA.forEach(cat => {
+                    currentLesson.push(...cat.items);
+                });
+                // သင်ခန်းစာ အစဉ်အတိုင်း မဖြစ်စေရန် ရောမွှေလိုက်ပါ
+                currentLesson = shuffleArray(currentLesson);
+
+                currentQuestionIndex = 0;
+                totalCorrect = 0;
+                updateProgress();
+                
+                // UI များကို စတင်ပြင်ဆင်ပါ
+                document.getElementById('end-modal').classList.add('hidden');
+                document.getElementById('feedback-footer').classList.remove('translate-y-0');
+                document.getElementById('feedback-footer').classList.add('translate-y-full');
+                
+                loadQuestion();
+            }
+
+            // မေးခွန်းအသစ်တစ်ခုကို တင်ပြရန်
+            function loadQuestion() {
+                if (currentQuestionIndex >= currentLesson.length) {
+                    showEndModal();
+                    return;
+                }
+
+                const currentItem = currentLesson[currentQuestionIndex];
+                const optionsContainer = document.getElementById('options-container');
+                const checkButton = document.getElementById('check-button');
+                const questionText = document.getElementById('question-text');
+
+                // Feedback Footer ကို ပြန်ဖျောက်ထားရန်
+                document.getElementById('feedback-footer').classList.add('translate-y-full');
+                document.getElementById('feedback-message').classList.add('hidden');
+                document.getElementById('continue-button').classList.add('hidden');
+                checkButton.classList.remove('hidden');
+                checkButton.disabled = true;
+                checkButton.classList.add('bg-gray-300', 'cursor-not-allowed');
+                checkButton.classList.remove('bg-primary', 'hover:bg-blue-600', 'text-white');
+                checkButton.textContent = "စစ်ဆေးရန်";
+                
+                selectedOption = null;
+                isAnswerChecked = false;
+                optionsContainer.innerHTML = '';
+                
+                // မေးခွန်းစာသားကို သတ်မှတ်ခြင်း (Burmese Purpose ကို အသုံးပြု)
+                questionText.innerHTML = `ဘယ် Keyword က **"${currentItem.purpose}"** ကို ဆိုလိုတာလဲ?`;
+
+                // ရွေးချယ်စရာများ (Options) ဖန်တီးခြင်း
+                const allItems = currentLesson;
+                // မှန်ကန်သောအဖြေကို ထည့်သွင်းပါ
+                let options = [{ text: currentItem.keyword, isCorrect: true }];
+
+                // အခြား မမှန်သော အဖြေ ၃ ခုကို ကျန် data များထဲမှ ကျပန်း ရွေးချယ်ပါ
+                const distractorPool = allItems.filter(item => item.keyword !== currentItem.keyword);
+                const shuffledDistractors = shuffleArray(distractorPool).slice(0, 3);
+                
+                shuffledDistractors.forEach(distractor => {
+                    options.push({ text: distractor.keyword, isCorrect: false });
+                });
+
+                // ရွေးချယ်စရာများကို ထပ်မံ ရောမွှေပါ
+                options = shuffleArray(options);
+
+                options.forEach((option, index) => {
+                    const button = document.createElement('button');
+                    button.textContent = option.text;
+                    button.className = 'option-button p-4 rounded-xl text-lg font-semibold text-gray-800 focus:outline-none text-left';
+                    button.setAttribute('data-keyword', option.text);
+                    button.onclick = () => selectOption(button, option.text);
+                    optionsContainer.appendChild(button);
+                });
+
+                updateProgress();
+            }
+
+            // Option တစ်ခု ရွေးချယ်သောအခါ
+            function selectOption(buttonElement, keyword) {
+                if (isAnswerChecked) return; // အဖြေ စစ်ပြီးသားဆိုရင် ထပ်မရွေးတော့
+
+                // အရင်ရွေးထားသော button ၏ selected state ကို ဖယ်ရှားခြင်း
+                document.querySelectorAll('.option-button').forEach(btn => {
+                    btn.classList.remove('selected');
+                    btn.style.boxShadow = 'none';
+                    btn.style.borderColor = 'var(--color-grey)';
+                });
+
+                // လက်ရှိ button ကို selected state ပေးခြင်း
+                buttonElement.classList.add('selected');
+                selectedOption = keyword;
+                
+                // Check button ကို enabled လုပ်ခြင်း
+                const checkButton = document.getElementById('check-button');
+                checkButton.disabled = false;
+                checkButton.classList.remove('bg-gray-300', 'cursor-not-allowed');
+                checkButton.classList.add('bg-primary', 'hover:bg-blue-600', 'text-white');
+                checkButton.style.backgroundColor = 'var(--color-primary)';
+            }
+
+            // အဖြေ စစ်ဆေးခြင်း
+            function checkAnswer() {
+                if (!selectedOption || isAnswerChecked) return;
+
+                isAnswerChecked = true;
+                const currentItem = currentLesson[currentQuestionIndex];
+                const isCorrect = selectedOption === currentItem.keyword;
+                const feedbackMessage = document.getElementById('feedback-message');
+                const footer = document.getElementById('feedback-footer');
+                const checkButton = document.getElementById('check-button');
+                const continueButton = document.getElementById('continue-button');
+
+                footer.classList.remove('translate-y-full');
+                footer.classList.add('translate-y-0');
+                feedbackMessage.classList.remove('hidden');
+
+                // Button များကို ပိတ်ပြီး အဖြေမှန်/အမှား ပြသခြင်း
+                document.querySelectorAll('.option-button').forEach(btn => {
+                    const isThisCorrect = btn.getAttribute('data-keyword') === currentItem.keyword;
+                    const isThisSelected = btn.getAttribute('data-keyword') === selectedOption;
+
+                    btn.disabled = true;
+                    btn.classList.remove('selected');
+                    
+                    if (isThisCorrect) {
+                        // အဖြေမှန်ကို အစိမ်းရောင်ပြရန်
+                        btn.style.borderColor = 'var(--color-correct)';
+                        btn.style.backgroundColor = '#e0ffe0';
+                    } else if (isThisSelected) {
+                        // မှားယွင်းရွေးချယ်ထားသော အဖြေကို အနီရောင်ပြရန်
+                        btn.style.borderColor = 'var(--color-incorrect)';
+                        btn.style.backgroundColor = '#ffe0e0';
+                    }
+                });
+
+                if (isCorrect) {
+                    totalCorrect++;
+                    feedbackMessage.textContent = '✅ အဖြေမှန်ပါတယ်!';
+                    feedbackMessage.classList.remove('incorrect-feedback');
+                    feedbackMessage.classList.add('correct-feedback');
+                    continueButton.textContent = 'ဆက်သွားရန်';
+                } else {
+                    feedbackMessage.textContent = `❌ မမှန်သေးပါဘူး။ အဖြေမှန်က "${currentItem.keyword}" ပါ။`;
+                    feedbackMessage.classList.remove('correct-feedback');
+                    feedbackMessage.classList.add('incorrect-feedback');
+                    continueButton.textContent = 'နောက်မေးခွန်းကို ဆက်ကြည့်ရန်';
+
+                    // အဖြေမှန်၏ ဥပမာကိုပါ ထည့်ပြနိုင်သည်
+                    const exampleCode = document.createElement('p');
+                    exampleCode.className = 'text-gray-100 text-sm mt-1';
+                    exampleCode.innerHTML = `**ဥပမာ:** <code>${currentItem.example}</code>`;
+                    feedbackMessage.appendChild(exampleCode);
+                }
+                
+                checkButton.classList.add('hidden');
+                continueButton.classList.remove('hidden');
+            }
+
+            // နောက်မေးခွန်းသို့ သွားရန်
+            function nextQuestion() {
+                currentQuestionIndex++;
+                loadQuestion();
+            }
+
+            // Progress Bar ကို update လုပ်ရန်
+            function updateProgress() {
+                const progress = (currentQuestionIndex / currentLesson.length) * 100;
+                document.getElementById('progress-bar').style.width = `${progress}%`;
+            }
+
+            // သင်ခန်းစာ ပြီးဆုံးကြောင်း ပြသရန်
+            function showEndModal() {
+                document.getElementById('final-score').textContent = `${totalCorrect}/${currentLesson.length}`;
+                document.getElementById('end-modal').classList.remove('hidden');
+            }
+
+            // သင်ခန်းစာကို ပြန်စရန်
+            function restartLesson() {
+                initializeLesson();
+            }
+
+            // App စတင်သောအခါ
+            window.onload = initializeLesson;
+        </script>
+    </body>
+    </html>
+
+
